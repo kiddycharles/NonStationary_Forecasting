@@ -109,24 +109,26 @@ def train(loader, net, criterion, optimizer, epoch, logger, args):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        input = input.float()
-        target = target.float()
+        input = input.float().cuda()
+        target = target.float().cuda()
 
         if args.padding == 0:
-            dec_inp = torch.zeros([target.shape[0], args.pred_len, target.shape[-1]]).float()
-            dec_inp = torch.cat([target[:, :args.label_len, :], dec_inp], dim=1).float()
+            dec_inp = torch.zeros([target.shape[0], args.pred_len, target.shape[-1]]).float().cuda()
+            dec_inp = torch.cat([target[:, :args.label_len, :], dec_inp], dim=1).float().cuda()
         elif args.padding == 1:
-            dec_inp = torch.ones([target.shape[0], args.pred_len, target.shape[-1]]).float()
-            dec_inp = torch.cat([target[:, :args.label_len, :], dec_inp], dim=1).float()
+            dec_inp = torch.ones([target.shape[0], args.pred_len, target.shape[-1]]).float().cuda()
+            dec_inp = torch.cat([target[:, :args.label_len, :], dec_inp], dim=1).float().cuda()
         elif args.padding == -1:
-            dec_inp = target.float()
+            dec_inp = target.float().cuda()
 
         #         print(args.output_attention)
         if args.output_attention:
             outputs, attens = net(input, dec_inp)
-            target = target[:, -args.pred_len:, 0:]
+            target = target[:, -args.pred_len:, 0:].cuda()
+        elif args.model == 'seq2seq':
+            output = net(input, target)
         else:
-            outputs = net(input, dec_inp)
+            outputs = net(input)
 
         loss = criterion(outputs, target)
         losses.update(loss.item(), input.size(0))
@@ -163,23 +165,25 @@ def test(loader, net, criterion, epoch, logger, args):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        input = input.float()
-        target = target.float()
+        input = input.float().cuda()
+        target = target.float().cuda()
 
         if args.padding == 0:
-            dec_inp = torch.zeros([target.shape[0], args.pred_len, target.shape[-1]]).float()
-            dec_inp = torch.cat([target[:, :args.label_len, :], dec_inp], dim=1).float()
+            dec_inp = torch.zeros([target.shape[0], args.pred_len, target.shape[-1]]).float().cuda()
+            dec_inp = torch.cat([target[:, :args.label_len, :], dec_inp], dim=1).float().cuda()
         elif args.padding == 1:
-            dec_inp = torch.ones([target.shape[0], args.pred_len, target.shape[-1]]).float()
-            dec_inp = torch.cat([target[:, :args.label_len, :], dec_inp], dim=1).float()
+            dec_inp = torch.ones([target.shape[0], args.pred_len, target.shape[-1]]).float().cuda()
+            dec_inp = torch.cat([target[:, :args.label_len, :], dec_inp], dim=1).float().cuda()
         elif args.padding == -1:
-            dec_inp = target.float()
+            dec_inp = target.float().cuda()
 
         if args.output_attention:
             outputs, attens = net(input, dec_inp)
-            target = target[:, -args.pred_len:, 0:]
+            target = target[:, -args.pred_len:, 0:].cuda()
+        elif args.model == 'seq2seq':
+            output = net(input, target)
         else:
-            outputs = net(input, dec_inp)
+            outputs = net(input)
 
         loss = criterion(outputs.detach().cpu(), target.detach().cpu())
 
@@ -212,21 +216,23 @@ def evaluate(loader, net, criterion):
         for i, (inputs, target) in enumerate(loader):
             args.batch = inputs.shape[0]
 
-            inputs = inputs.float()
-            target = target.float()
+            inputs = inputs.float().cuda()
+            target = target.float().cuda()
 
             if args.padding == 0:
-                dec_inp = torch.zeros([target.shape[0], args.pred_len, target.shape[-1]]).float()
+                dec_inp = torch.zeros([target.shape[0], args.pred_len, target.shape[-1]]).float().cuda()
             elif args.padding == 1:
-                dec_inp = torch.ones([target.shape[0], args.pred_len, target.shape[-1]]).float()
+                dec_inp = torch.ones([target.shape[0], args.pred_len, target.shape[-1]]).float().cuda()
 
-            dec_inp = torch.cat([target[:, :args.label_len, :], dec_inp], dim=1).float()
+            dec_inp = torch.cat([target[:, :args.label_len, :], dec_inp], dim=1).float().cuda()
 
             if args.output_attention:
                 outputs, attens = net(inputs, dec_inp)
-                target = target[:, -args.pred_len:, 0:]
+                target = target[:, -args.pred_len:, 0:].cuda()
+            elif args.model == 'seq2seq':
+                output = net(input, target)
             else:
-                outputs = net(input, dec_inp)
+                outputs = net(input)
             if i < 6:
                 plt.figure(figsize=(64, 16))
                 plt.plot(target.reshape(-1, 1).detach().cpu().numpy()[:1000], color='blue', alpha=0.5, linewidth=3,
@@ -255,6 +261,7 @@ def evaluate(loader, net, criterion):
 
 
 def main():
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
     file_list = sorted(os.listdir(args.traindir))
     data_list = [file for file in file_list if file.endswith(".csv")]
     if args.dataset == 'e':
@@ -337,10 +344,10 @@ def main():
                     args.output_attention,
                     args.distil,
                     args.mix
-                ).float()
+                ).float().cuda()
 
-                # input_data = torch.randn(1, 100,1)
-                # other_input_data = torch.randn(1, 300,1)
+                # input_data = torch.randn(1, 100,1).cuda()
+                # other_input_data = torch.randn(1, 300,1).cuda()
 
                 # summaryx(net,input_data, other_input_data)
                 # import ipdb; ipdb.set_trace()
@@ -372,7 +379,7 @@ def main():
                     enc_k=enc_k,
                     dec_k=dec_k,
                     headwise_sharing=args.headwise_sharing, key_value_sharing=args.key_value_sharing
-                ).float()
+                ).float().cuda()
 
             elif args.model == 'reformer':
                 enc_bucket_size = args.seq_len // 2 if args.enc_bucket_size == 0 else args.enc_bucket_size
@@ -402,11 +409,11 @@ def main():
                                              enc_n_local_attn_heads=args.enc_n_local_attn_heads,
                                              dec_n_local_attn_heads=args.dec_n_local_attn_heads,
                                              enc_use_full_attn=args.enc_use_full_attn,
-                                             dec_use_full_attn=args.dec_use_full_attn)
+                                             dec_use_full_attn=args.dec_use_full_attn).cuda()
 
             # net = nn.DataParallel(net)
 
-            criterion = nn.MSELoss()
+            criterion = nn.MSELoss().cuda()
 
             optimizer = optim.Adam(net.parameters(), lr=1e-3)
 
