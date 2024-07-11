@@ -9,33 +9,34 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
-
+import matplotlib as mpl
 import dataloader
 import utils.utils as utils
-from models.Informer.model import Informer, InformerStack
-# from models.Linformer.model import Linformer
-from models.Seq2Seq.seq2seq import Seq2SeqEncDec
-from utils.metrics import MSE, MAE, RMSE
+from models import Informer, InformerStack
 
-plt.rcParams['agg.path.chunksize'] = 10000
-parser = argparse.ArgumentParser(description='Time series forecasting')
+# Image output setting
+mpl.rcParams['agg.path.chunksize'] = 10000
 
-# What is informer light?
+
+# argparse will figure out how to parse sys.argv and automatically generates help and usage messages.
+# also issue errors when users give the program invalid arguments.
+
+parser = argparse.ArgumentParser(prog='Non-stationary Forecasting', description='Time series forecasting')
+
 parser.add_argument('--model', type=str, default='informer',
-                    help='model of experiment, options: [informer, informerstack, informerlight(TBD), linformer]')
+                    help='model of experiment, options: [informer, informerstack]')
 
 parser.add_argument('--dataset', type=str, help='dataset: e, stock', default=None)
 parser.add_argument('--folder_name', type=str, help='exp-folder-name', default='')
 
 parser.add_argument('--epochs', default=200, type=int, help='epoch (default: 200)')
 parser.add_argument('--batch_size', default=1500, type=int, help='batch size (default: 1024)')
-# parser.add_argument('--save-root', default='./exp-results-hidden32/', type=str, help='save root')
+parser.add_argument('--save-root', default='./exp-results-hidden32/', type=str, help='save root')
 parser.add_argument('--print_freq', '-p', default=10, type=int, metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--hidden_size', default=32, type=int, help='hidden size (default: 128)')
 parser.add_argument('--traindir', default='./data', type=str, help='train data path')
-# parser.add_argument('--testdir',default = '/daintlab/data/sigkdd2021/PhaseII/testset', type=str, help='test data path')
+parser.add_argument('--testdir',default = '/daintlab/data/sigkdd2021/PhaseII/testset', type=str, help='test data path')
 parser.add_argument('--gpu_id', default='0', type=str, help='gpu number')
 
 parser.add_argument('--seq_len', type=int, default=100, help='input sequence length of Informer encoder')
@@ -79,17 +80,6 @@ parser.add_argument('--inverse', action='store_true', help='inverse output data'
 parser.add_argument('--features', type=str, default='S', help='forecasting task, options:[M, S, MS]; '
                                                               'M:multivariate predict multivariate, S:univariate '
                                                               'predict univariate, MS:multivariate predict univariate')
-
-## Linformer options
-parser.add_argument('--enc_k', type=int, help='Linformer/ K ', default=None)
-parser.add_argument('--dec_k', type=int, help='Linformer/ K ', default=None)
-parser.add_argument('--headwise_sharing', action='store_true', help='Linformer/use headwise sharing', default=False)
-parser.add_argument('--key_value_sharing', action='store_true', help='Linformer/use key value sharing', default=False)
-
-parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
-# parser.add_argument('--gpu', type=int, default=0, help='gpu')
-parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple gpus', default=False)
-parser.add_argument('--devices', type=str, default='0,1,2,3', help='device ids of multile gpus')
 
 args = parser.parse_args()
 
@@ -201,7 +191,7 @@ def test(loader, net, criterion, epoch, logger, args):
     return epoch, losses.avg, preds, trues
 
 
-def evaluate(loader, net, criterion):
+def evaluate(loader, net):
     batch_time = utils.AverageMeter()
     losses = utils.AverageMeter()
     end = time.time()
@@ -226,7 +216,7 @@ def evaluate(loader, net, criterion):
                 outputs, attens = net(inputs, dec_inp)
                 target = target[:, -args.pred_len:, 0:]
             else:
-                outputs = net(input, dec_inp)
+                outputs = net(inputs, dec_inp)
             if i < 6:
                 plt.figure(figsize=(64, 16))
                 plt.plot(target.reshape(-1, 1).detach().cpu().numpy()[:1000], color='blue', alpha=0.5, linewidth=3,
@@ -424,7 +414,7 @@ def main():
                                     args)
                 epoch, tst_loss, preds, trues = test(test_loader, net, criterion, epoch, test_logger, args)
 
-            pred, trues = evaluate(test_loader, net, criterion)
+            pred, trues = evaluate(test_loader, net)
 
             torch.save(net.state_dict(),
                        os.path.join(save_path, f'model_{int(args.epochs)}.pth'))

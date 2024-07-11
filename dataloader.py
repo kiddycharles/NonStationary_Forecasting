@@ -20,15 +20,16 @@ def minmax_scaling(x, min_value, max_value):
 
 
 class loader(Dataset):
-    def __init__(self, targetdir, file_name, seq_size=(100, 50, 25), args=None, loader_type='train', features='S',
+    def __init__(self, target_dir, file_name, seq_size=(100, 50, 25), args=None, loader_type='train', features='S',
                  transform=None):
-        self.seq_len = seq_size[0]
-        self.label_len = seq_size[1]
-        self.pred_len = seq_size[2]
-        self.transform = transform
+        self.seq_len = seq_size[0]    # Sequence length for learning
+        self.label_len = seq_size[1]  # Sequence length for guiding
+        self.pred_len = seq_size[2]   # Sequence length for predicting
+        self.transform = transform    # Normalization
         self.args = args
 
-        data = pd.read_csv(os.path.join(targetdir, file_name), index_col=0)
+        file_path = os.path.join(target_dir, file_name)
+        data = pd.read_csv(file_path, index_col=0)
 
         if features == 'S':
             data = data[['close']]

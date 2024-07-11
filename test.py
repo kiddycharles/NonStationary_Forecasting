@@ -1,9 +1,8 @@
-from models.Informer.model import Informer, InformerStack
+from models import Informer, InformerStack
 import dataloader
 import utils.utils as util
 from utils.metrics import MSE
 import time
-import csv
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,9 +10,7 @@ import pandas as pd
 import os
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import torch.backends.cudnn as cudnn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
 parser = argparse.ArgumentParser(description='Fire detection')
 

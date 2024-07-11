@@ -80,26 +80,6 @@ class Encoder(nn.Module):
         return x, attns
 
 
-class EncoderStack(nn.Module):
-    def __init__(self, encoders, inp_lens):
-        super(EncoderStack, self).__init__()
-        self.encoders = nn.ModuleList(encoders)
-        self.inp_lens = inp_lens
-
-    def forward(self, x, attn_mask=None):
-        # x [B, L, D]
-        x_stack = []
-        attns = []
-        for i_len, encoder in zip(self.inp_lens, self.encoders):
-            inp_len = x.shape[1] // (2 ** i_len)
-            x_s, attn = encoder(x[:, -inp_len:, :])
-            x_stack.append(x_s)
-            attns.append(attn)
-        x_stack = torch.cat(x_stack, -2)
-
-        return x_stack, attns
-
-
 class DecoderLayer(nn.Module):
     def __init__(self, self_attention, cross_attention, d_model, d_ff=None,
                  dropout=0.1, activation="relu"):
