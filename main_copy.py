@@ -292,11 +292,11 @@ def main():
 
             args.save_root = f'./exp/{args.model}-{key}-{args.folder_name}/'
 
-            train_dataset = dataloader.loader(args.traindir, data_list[i],
-                                              seq_size=type_dict[key], loader_type='train', args=args)
+            train_dataset = dataloader.StockDataset(args.traindir, data_list[i],
+                                                    seq_size=type_dict[key], loader_type='train', args=args)
 
-            test_dataset = dataloader.loader(args.traindir, data_list[i],
-                                             seq_size=type_dict[key], loader_type='test', args=args)
+            test_dataset = dataloader.StockDataset(args.traindir, data_list[i],
+                                                   seq_size=type_dict[key], loader_type='test', args=args)
 
             save_path = os.path.join(args.save_root, data_list[i])
 

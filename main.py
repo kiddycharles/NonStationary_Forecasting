@@ -1,4 +1,3 @@
-# from utils.tools import EarlyStopping, adjust_learning_rate
 import argparse
 import os
 import time
@@ -13,7 +12,8 @@ from torch.utils.data import DataLoader
 import matplotlib as mpl
 import dataloader
 import utils.utils as utils
-from models import Informer, InformerStack
+from models import Informer
+from utils.metrics import MAE, MSE, RMSE
 
 # Image output setting
 mpl.rcParams['agg.path.chunksize'] = 10000
@@ -277,11 +277,11 @@ def main():
 
             args.save_root = f'./exp/{args.model}-{key}-{args.folder_name}/'
 
-            train_dataset = dataloader.loader(args.traindir, data_list[i],
-                                              seq_size=type_dict[key], loader_type='train', args=args)
+            train_dataset = dataloader.StockDataset(args.traindir, data_list[i],
+                                                    seq_size=type_dict[key], loader_type='train', args=args)
 
-            test_dataset = dataloader.loader(args.traindir, data_list[i],
-                                             seq_size=type_dict[key], loader_type='test', args=args)
+            test_dataset = dataloader.StockDataset(args.traindir, data_list[i],
+                                                   seq_size=type_dict[key], loader_type='test', args=args)
 
             save_path = os.path.join(args.save_root, data_list[i])
 
@@ -299,10 +299,7 @@ def main():
                                      pin_memory=False)
 
             model_dict = {
-                'informer': Informer,
-                'informerstack': InformerStack,
-                #  'reformer':ReformerEncDec,
-                # 'linformer': Linformer
+                'informer': Informer
             }
             if args.model == 'informer' or args.model == 'informerstack':
                 e_layers = args.e_layers if args.model == 'informer' else args.s_layers  ################################
@@ -328,73 +325,6 @@ def main():
                     args.distil,
                     args.mix
                 ).float()
-
-                # input_data = torch.randn(1, 100,1)
-                # other_input_data = torch.randn(1, 300,1)
-
-                # summaryx(net,input_data, other_input_data)
-                # import ipdb; ipdb.set_trace()
-
-            elif args.model == 'linformer':
-                e_layers = args.e_layers if args.model == 'linformer' else args.s_layers  ################################
-                enc_k = (args.seq_len) // 2 if (args.enc_k is None) else args.enc_k
-                dec_k = (args.pred_len + args.label_len) // 2 if (args.dec_k is None) else args.dec_k
-                net = model_dict[args.model](
-                    args.enc_in,
-                    args.dec_in,
-                    args.c_out,
-                    args.seq_len,
-                    args.label_len,
-                    args.pred_len,
-                    args.factor,
-                    args.d_model,
-                    args.n_heads,
-                    e_layers,  # self.args.e_layers,
-                    args.d_layers,
-                    args.d_ff,
-                    args.dropout,
-                    args.attn,
-                    args.embed,
-                    activation=args.activation,
-                    output_attention=args.output_attention,
-                    distil=args.distil,
-                    mix=args.mix,
-                    enc_k=enc_k,
-                    dec_k=dec_k,
-                    headwise_sharing=args.headwise_sharing, key_value_sharing=args.key_value_sharing
-                ).float()
-
-            elif args.model == 'reformer':
-                enc_bucket_size = args.seq_len // 2 if args.enc_bucket_size == 0 else args.enc_bucket_size
-                dec_bucket_size = (
-                                          args.label_len + args.pred_len) // 2 if args.enc_bucket_size == 0 else args.enc_bucket_size
-                net = model_dict[args.model](dim=args.enc_in, seq_len=args.seq_len,
-                                             label_len=args.label_len,
-                                             pred_len=args.pred_len,
-                                             enc_bucket_size=enc_bucket_size,  # default: maxlen 128 , bucket_size 64
-                                             dec_bucket_size=dec_bucket_size,  # default: maxlen 128 , bucket_size 64
-                                             enc_depth=args.enc_depth,
-                                             dec_depth=args.dec_depth,
-                                             enc_heads=args.enc_heads,  #default: 8
-                                             dec_heads=args.dec_heads,  #default: 8
-                                             enc_dim_head=args.enc_dim_head,
-                                             dec_dim_head=args.dec_dim_head,
-                                             enc_n_hashes=args.enc_n_hashes,
-                                             dec_n_hashes=args.dec_n_hashes,
-                                             enc_ff_chunks=args.enc_ff_chunks,
-                                             dec_ff_chunks=args.dec_ff_chunks,
-                                             enc_attn_chunks=args.enc_attn_chunks,
-                                             dec_attn_chunks=args.dec_attn_chunks,
-                                             enc_weight_tie=args.enc_weight_tie,
-                                             dec_weight_tie=args.dec_weight_tie,
-                                             enc_causal=args.enc_causal,
-                                             dec_causal=args.dec_causal,
-                                             enc_n_local_attn_heads=args.enc_n_local_attn_heads,
-                                             dec_n_local_attn_heads=args.dec_n_local_attn_heads,
-                                             enc_use_full_attn=args.enc_use_full_attn,
-                                             dec_use_full_attn=args.dec_use_full_attn)
-
-            # net = nn.DataParallel(net)
 
             criterion = nn.MSELoss()
 

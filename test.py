@@ -215,8 +215,8 @@ for i in range(len(data_list)):
 
         save_path = os.path.join(args.save_root, data_list[i])
 
-        test_dataset = dataloader.loader(args.traindir,data_list[i],
-                                            seq_size = type_dict[key],loader_type = 'test',args = args)
+        test_dataset = dataloader.StockDataset(args.traindir, data_list[i],
+                                               seq_size = type_dict[key], loader_type = 'test', args = args)
 
         test_loader = DataLoader(test_dataset,
                                     shuffle=False, 
@@ -238,8 +238,8 @@ for i in range(len(data_list)):
         plt.close()
 
         # inverse scaling
-        train_dataset = dataloader.loader(args.traindir,data_list[i],
-                                                seq_size = type_dict[key],loader_type = 'test')
+        train_dataset = dataloader.StockDataset(args.traindir, data_list[i],
+                                                seq_size = type_dict[key], loader_type = 'test')
 
         min_val, max_val = train_dataset.get_minmax()
 

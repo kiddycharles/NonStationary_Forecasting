@@ -9,17 +9,15 @@ def get_global_values(df):
     col = df.columns
     min_value = min(df[col[0]])
     max_value = max(df[col[0]])
-    # import ipdb; ipdb.set_trace()
     return min_value, max_value
 
 
 def minmax_scaling(x, min_value, max_value):
     x[:, 0] = (x[:, 0] - min_value) / (max_value - min_value)
-
     return x
 
 
-class loader(Dataset):
+class StockDataset(Dataset):
     def __init__(self, target_dir, file_name, seq_size=(100, 50, 25), args=None, loader_type='train', features='S',
                  transform=None):
         self.seq_len = seq_size[0]    # Sequence length for learning
