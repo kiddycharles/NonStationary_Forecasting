@@ -21,6 +21,7 @@ class FullAttention(nn.Module):
         scale = self.scale or 1. / sqrt(E)
 
         scores = torch.einsum("blhe,bshe->bhls", queries, keys)
+
         if self.mask_flag:
             if attn_mask is None:
                 attn_mask = TriangularCausalMask(B, L, device=queries.device)
@@ -52,8 +53,7 @@ class ProbAttention(nn.Module):
 
         # calculate the sampled Q_K
         K_expand = K.unsqueeze(-3).expand(B, H, L_Q, L_K, E)
-        # real U = U_part(factor*ln(L_k))*L_q
-        index_sample = torch.randint(L_K, (L_Q, sample_k))
+        index_sample = torch.randint(L_K, (L_Q, sample_k))  # real U = U_part(factor*ln(L_k))*L_q
         K_sample = K_expand[:, :, torch.arange(L_Q).unsqueeze(1), index_sample, :]
         Q_K_sample = torch.matmul(Q.unsqueeze(-2), K_sample.transpose(-2, -1)).squeeze()
 
@@ -76,8 +76,7 @@ class ProbAttention(nn.Module):
             V_sum = V.mean(dim=-2)
             contex = V_sum.unsqueeze(-2).expand(B, H, L_Q, V_sum.shape[-1]).clone()
         else:  # use mask
-            # requires that L_Q == L_V, i.e. for self-attention only
-            assert (L_Q == L_V)
+            assert (L_Q == L_V)  # requires that L_Q == L_V, i.e. for self-attention only
             contex = V.cumsum(dim=-2)
         return contex
 
@@ -125,12 +124,12 @@ class ProbAttention(nn.Module):
         # update the context with selected top_k queries
         context, attn = self._update_context(context, values, scores_top, index, L_Q, attn_mask)
 
-        return context.transpose(2, 1).contiguous(), attn
+        return context.contiguous(), attn
 
 
 class AttentionLayer(nn.Module):
-    def __init__(self, attention, d_model, n_heads,
-                 d_keys=None, d_values=None, mix=False):
+    def __init__(self, attention, d_model, n_heads, d_keys=None,
+                 d_values=None):
         super(AttentionLayer, self).__init__()
 
         d_keys = d_keys or (d_model // n_heads)
@@ -142,7 +141,6 @@ class AttentionLayer(nn.Module):
         self.value_projection = nn.Linear(d_model, d_values * n_heads)
         self.out_projection = nn.Linear(d_values * n_heads, d_model)
         self.n_heads = n_heads
-        self.mix = mix
 
     def forward(self, queries, keys, values, attn_mask):
         B, L, _ = queries.shape
@@ -159,8 +157,6 @@ class AttentionLayer(nn.Module):
             values,
             attn_mask
         )
-        if self.mix:
-            out = out.transpose(2, 1).contiguous()
         out = out.view(B, L, -1)
 
         return self.out_projection(out), attn

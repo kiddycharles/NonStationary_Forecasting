@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from layers.Embed import DataEmbedding
+from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, DataEmbedding_wo_temp, DataEmbedding_wo_pos_temp
 from layers.SelfAttention_Family import ProbAttention, AttentionLayer
 from layers.Transformer_EncDec import Decoder, DecoderLayer, Encoder, EncoderLayer, ConvLayer
 
@@ -9,30 +9,40 @@ from layers.Transformer_EncDec import Decoder, DecoderLayer, Encoder, EncoderLay
 class Model(nn.Module):
     """
     Informer with Propspare attention in O(LlogL) complexity
-    Paper link: https://ojs.aaai.org/index.php/AAAI/article/view/17325/17132
     """
 
     def __init__(self, configs):
         super(Model, self).__init__()
-
         self.pred_len = configs.pred_len
-        self.label_len = configs.label_len
-
-        if configs.channel_independence:
-            self.enc_in = 1
-            self.dec_in = 1
-            self.c_out = 1
-        else:
-            self.enc_in = configs.enc_in   # encoder channel input
-            self.dec_in = configs.dec_in   # decoder channel input
-            self.c_out = configs.c_out     # how many channel want to predict
+        self.output_attention = configs.output_attention
 
         # Embedding
-        self.enc_embedding = DataEmbedding(self.enc_in, configs.d_model, configs.embed, configs.freq,
-                                           configs.dropout)
-        self.dec_embedding = DataEmbedding(self.dec_in, configs.d_model, configs.embed, configs.freq,
-                                           configs.dropout)
+        if configs.embed_type == 0:
+            self.enc_embedding = DataEmbedding(configs.enc_in, configs.d_model, configs.embed, configs.freq,
+                                               configs.dropout)
+            self.dec_embedding = DataEmbedding(configs.dec_in, configs.d_model, configs.embed, configs.freq,
+                                               configs.dropout)
+        elif configs.embed_type == 1:
+            self.enc_embedding = DataEmbedding(configs.enc_in, configs.d_model, configs.embed, configs.freq,
+                                               configs.dropout)
+            self.dec_embedding = DataEmbedding(configs.dec_in, configs.d_model, configs.embed, configs.freq,
+                                               configs.dropout)
+        elif configs.embed_type == 2:
+            self.enc_embedding = DataEmbedding_wo_pos(configs.enc_in, configs.d_model, configs.embed, configs.freq,
+                                                      configs.dropout)
+            self.dec_embedding = DataEmbedding_wo_pos(configs.dec_in, configs.d_model, configs.embed, configs.freq,
+                                                      configs.dropout)
 
+        elif configs.embed_type == 3:
+            self.enc_embedding = DataEmbedding_wo_temp(configs.enc_in, configs.d_model, configs.embed, configs.freq,
+                                                       configs.dropout)
+            self.dec_embedding = DataEmbedding_wo_temp(configs.dec_in, configs.d_model, configs.embed, configs.freq,
+                                                       configs.dropout)
+        elif configs.embed_type == 4:
+            self.enc_embedding = DataEmbedding_wo_pos_temp(configs.enc_in, configs.d_model, configs.embed, configs.freq,
+                                                           configs.dropout)
+            self.dec_embedding = DataEmbedding_wo_pos_temp(configs.dec_in, configs.d_model, configs.embed, configs.freq,
+                                                           configs.dropout)
         # Encoder
         self.encoder = Encoder(
             [
@@ -75,17 +85,20 @@ class Model(nn.Module):
             projection=nn.Linear(configs.d_model, configs.c_out, bias=True)
         )
 
+    def forward(self, x_enc, x_mark_enc=None, x_dec=None, x_mark_dec=None,
+                enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
 
-    def long_forecast(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
+        x_mark_enc = torch.zeros(x_enc.shape[0], x_enc.shape[1], 4).to(x_enc.device)
+        x_dec = torch.zeros(x_enc.shape[0], 48 + 720, x_enc.shape[2]).to(x_enc.device)
+        x_mark_dec = torch.zeros(x_enc.shape[0], 48 + 720, 4).to(x_enc.device)
+
         enc_out = self.enc_embedding(x_enc, x_mark_enc)
+        enc_out, attns = self.encoder(enc_out, attn_mask=enc_self_mask)
+
         dec_out = self.dec_embedding(x_dec, x_mark_dec)
-        enc_out, attns = self.encoder(enc_out, attn_mask=None)
+        dec_out = self.decoder(dec_out, enc_out, x_mask=dec_self_mask, cross_mask=dec_enc_mask)
 
-        dec_out = self.decoder(dec_out, enc_out, x_mask=None, cross_mask=None)
-
-        return dec_out  # [B, L, D]
-
-
-    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, mask=None):
-        dec_out = self.long_forecast(x_enc, x_mark_enc, x_dec, x_mark_dec)
-        return dec_out[:, -self.pred_len:, :]  # [B, L, D]
+        if self.output_attention:
+            return dec_out[:, -self.pred_len:, :], attns
+        else:
+            return dec_out[:, -self.pred_len:, :]  # [B, L, D]
