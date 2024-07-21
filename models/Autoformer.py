@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
+from layers.Embed import DataEmbedding, DataEmbedding_wo_pos,DataEmbedding_wo_pos_temp,DataEmbedding_wo_temp
 from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
 from layers.Autoformer_EncDec import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm, series_decomp
-from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, DataEmbedding_wo_pos_temp, DataEmbedding_wo_temp
+import math
+import numpy as np
 
 
 class Model(nn.Module):
@@ -11,7 +13,6 @@ class Model(nn.Module):
     Autoformer is the first method to achieve the series-wise connection,
     with inherent O(LlogL) complexity
     """
-
     def __init__(self, configs):
         super(Model, self).__init__()
         self.seq_len = configs.seq_len
@@ -28,31 +29,31 @@ class Model(nn.Module):
         # Thus, we can discard the position embedding of transformers.
         if configs.embed_type == 0:
             self.enc_embedding = DataEmbedding_wo_pos(configs.enc_in, configs.d_model, configs.embed, configs.freq,
-                                                      configs.dropout)
+                                                    configs.dropout)
             self.dec_embedding = DataEmbedding_wo_pos(configs.dec_in, configs.d_model, configs.embed, configs.freq,
-                                                      configs.dropout)
+                                                    configs.dropout)
         elif configs.embed_type == 1:
             self.enc_embedding = DataEmbedding(configs.enc_in, configs.d_model, configs.embed, configs.freq,
-                                               configs.dropout)
+                                                    configs.dropout)
             self.dec_embedding = DataEmbedding(configs.dec_in, configs.d_model, configs.embed, configs.freq,
-                                               configs.dropout)
+                                                    configs.dropout)
         elif configs.embed_type == 2:
             self.enc_embedding = DataEmbedding_wo_pos(configs.enc_in, configs.d_model, configs.embed, configs.freq,
-                                                      configs.dropout)
+                                                    configs.dropout)
             self.dec_embedding = DataEmbedding_wo_pos(configs.dec_in, configs.d_model, configs.embed, configs.freq,
-                                                      configs.dropout)
+                                                    configs.dropout)
 
         elif configs.embed_type == 3:
             self.enc_embedding = DataEmbedding_wo_temp(configs.enc_in, configs.d_model, configs.embed, configs.freq,
-                                                       configs.dropout)
+                                                    configs.dropout)
             self.dec_embedding = DataEmbedding_wo_temp(configs.dec_in, configs.d_model, configs.embed, configs.freq,
-                                                       configs.dropout)
+                                                    configs.dropout)
         elif configs.embed_type == 4:
             self.enc_embedding = DataEmbedding_wo_pos_temp(configs.enc_in, configs.d_model, configs.embed, configs.freq,
-                                                           configs.dropout)
+                                                    configs.dropout)
             self.dec_embedding = DataEmbedding_wo_pos_temp(configs.dec_in, configs.d_model, configs.embed, configs.freq,
-                                                           configs.dropout)
-
+                                                    configs.dropout)
+        
         # Encoder
         self.encoder = Encoder(
             [
@@ -99,8 +100,8 @@ class Model(nn.Module):
                 enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
 
         x_mark_enc = torch.zeros(x_enc.shape[0], x_enc.shape[1], 4).to(x_enc.device)
-        x_dec = torch.zeros(x_enc.shape[0], 48 + 720, x_enc.shape[2]).to(x_enc.device)
-        x_mark_dec = torch.zeros(x_enc.shape[0], 48 + 720, 4).to(x_enc.device)
+        x_dec = torch.zeros(x_enc.shape[0], 48+720, x_enc.shape[2]).to(x_enc.device)
+        x_mark_dec = torch.zeros(x_enc.shape[0], 48+720, 4).to(x_enc.device)
 
         # decomp init
         mean = torch.mean(x_enc, dim=1).unsqueeze(1).repeat(1, self.pred_len, 1)

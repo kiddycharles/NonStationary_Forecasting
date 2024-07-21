@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-
 from layers.Embed import PositionalEmbedding
+import numpy as np
+
 
 
 class Model(nn.Module):

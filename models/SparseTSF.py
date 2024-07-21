@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from layers.Embed import PositionalEmbedding
 
 
 class Model(nn.Module):
@@ -23,7 +24,7 @@ class Model(nn.Module):
     def forward(self, x):
         batch_size = x.shape[0]
         # normalization and permute     b,s,c -> b,c,s
-        seq_mean = torch.mean(x, dim=1).unsqueeze(1)
+        seq_mean = torch.mean(x, dim=1).unsqueeze(1)  # sequence mean
         x = (x - seq_mean).permute(0, 2, 1)
 
         # 1D convolution aggregation
